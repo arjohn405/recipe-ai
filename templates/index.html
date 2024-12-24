@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recipe Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="generate-button-container">
+                <button id="generateButton" class="generate-button">Generate New Recipe</button>
+            </div>
+            <div class="recipe-list" id="recipeList">
+                <!-- Recipes will be displayed here -->
+            </div>
+        </div>
+        <div class="current-recipe" id="currentRecipe">
+            <div class="recipe-content">
+                <h2>Generate a recipe to get started!</h2>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let recipes = [];
+
+        function handleImageError(img) {
+            // Try different fallback images if one fails
+            if (!img.dataset.fallback) {
+                img.dataset.fallback = 'true';
+                img.src = `https://source.unsplash.com/1200x800/?food,cooking,${Date.now()}`;
+            } else {
+                // If fallback also fails, use a static backup image
+                img.src = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200";
+            }
+        }
+
+        function displayRecipe(recipe) {
+            document.getElementById('currentRecipe').innerHTML = `
+                <div class="recipe-content">
+                    <h2>${recipe.name}</h2>
+                    <div class="recipe-image">
+                        <img src="${recipe.image_url}" 
+                             alt="${recipe.name}" 
+                             onerror="handleImageError(this)"
+                             loading="lazy">
+                    </div>
+                    <p class="description">${recipe.description}</p>
+                    
+                    <div class="recipe-meta">
+                        <span>Prep Time: ${recipe.prep_time}</span>
+                        <span>Cook Time: ${recipe.cook_time}</span>
+                        <span>Servings: ${recipe.servings}</span>
+                    </div>
+
+                    <h3>Ingredients:</h3>
+                    <ul>
+                        ${recipe.ingredients.map(ingredient => `<li>${ingredient}</li>`).join('')}
+                    </ul>
+
+                    <h3>Instructions:</h3>
+                    <ol>
+                        ${recipe.instructions.map(step => `<li>${step}</li>`).join('')}
+                    </ol>
+                </div>
+            `;
+        }
+
+        document.getElementById('generateButton').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/recipe');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const recipe = JSON.parse(data.recipe);
+                    recipes.unshift(recipe); // Add new recipe to the beginning of array
+                    
+                    // Add to recipe list
+                    const recipeList = document.getElementById('recipeList');
+                    const recipeItem = document.createElement('div');
+                    recipeItem.className = 'recipe-item';
+                    recipeItem.innerHTML = `
+                        <img src="${recipe.image_url}" 
+                             alt="${recipe.name}" 
+                             class="recipe-thumbnail"
+                             onerror="handleImageError(this)">
+                        <span>${recipe.name}</span>
+                    `;
+                    recipeItem.addEventListener('click', () => displayRecipe(recipe));
+                    recipeList.insertBefore(recipeItem, recipeList.firstChild);
+                    
+                    // Display the new recipe
+                    displayRecipe(recipe);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html>
