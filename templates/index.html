@@ -1,44 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Recipe Generator</title>
+    <title>CulinaryAI - Recipe Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
+            <div class="brand">
+                <i class="fas fa-utensils"></i>
+                <h1>CulinaryAI</h1>
+            </div>
             <div class="generate-button-container">
-                <button id="generateButton" class="generate-button">Generate New Recipe</button>
+                <button id="generateButton" class="generate-button">
+                    <i class="fas fa-magic"></i>
+                    Generate New Recipe
+                </button>
+            </div>
+            <div class="recipe-list-header">
+                <h3>Recipe History</h3>
+                <span class="recipe-count">0 recipes</span>
             </div>
             <div class="recipe-list" id="recipeList">
                 <!-- Recipes will be displayed here -->
             </div>
         </div>
-        <div class="current-recipe" id="currentRecipe">
-            <div class="recipe-content">
-                <h2>Generate a recipe to get started!</h2>
+        <div class="main-content">
+            <div id="loadingOverlay" class="loading-overlay hidden">
+                <div class="loader"></div>
+                <p>Crafting your recipe...</p>
+            </div>
+            <div class="current-recipe" id="currentRecipe">
+                <div class="welcome-screen">
+                    <i class="fas fa-hat-chef"></i>
+                    <h2>Welcome to CulinaryAI</h2>
+                    <p>Click 'Generate New Recipe' to start your culinary journey!</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         let recipes = [];
+        let recipeCount = 0;
+        
+        function updateRecipeCount() {
+            document.querySelector('.recipe-count').textContent = `${recipeCount} recipe${recipeCount !== 1 ? 's' : ''}`;
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
 
         function handleImageError(img) {
-            // Try different fallback images if one fails
             if (!img.dataset.fallback) {
                 img.dataset.fallback = 'true';
                 img.src = `https://source.unsplash.com/1200x800/?food,cooking,${Date.now()}`;
             } else {
-                // If fallback also fails, use a static backup image
                 img.src = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200";
             }
         }
 
-        function displayRecipe(recipe) {
-            document.getElementById('currentRecipe').innerHTML = `
-                <div class="recipe-content">
-                    <h2>${recipe.name}</h2>
+        function displayRecipe(recipe, animate = false) {
+            const content = `
+                <div class="recipe-content ${animate ? 'fade-in' : ''}">
+                    <div class="recipe-header">
+                        <h2>${recipe.name}</h2>
+                        <span class="recipe-category">${recipe.category}</span>
+                    </div>
                     <div class="recipe-image">
                         <img src="${recipe.image_url}" 
                              alt="${recipe.name}" 
@@ -48,52 +83,91 @@
                     <p class="description">${recipe.description}</p>
                     
                     <div class="recipe-meta">
-                        <span>Prep Time: ${recipe.prep_time}</span>
-                        <span>Cook Time: ${recipe.cook_time}</span>
-                        <span>Servings: ${recipe.servings}</span>
+                        <div class="meta-item">
+                            <i class="fas fa-clock"></i>
+                            <span>Prep: ${recipe.prep_time}</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-fire"></i>
+                            <span>Cook: ${recipe.cook_time}</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-users"></i>
+                            <span>Serves: ${recipe.servings}</span>
+                        </div>
                     </div>
 
-                    <h3>Ingredients:</h3>
-                    <ul>
-                        ${recipe.ingredients.map(ingredient => `<li>${ingredient}</li>`).join('')}
-                    </ul>
+                    <div class="recipe-details">
+                        <div class="ingredients-section">
+                            <h3><i class="fas fa-list"></i> Ingredients</h3>
+                            <ul>
+                                ${recipe.ingredients.map(ingredient => `
+                                    <li>
+                                        <i class="fas fa-check"></i>
+                                        <span>${ingredient}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
 
-                    <h3>Instructions:</h3>
-                    <ol>
-                        ${recipe.instructions.map(step => `<li>${step}</li>`).join('')}
-                    </ol>
+                        <div class="instructions-section">
+                            <h3><i class="fas fa-tasks"></i> Instructions</h3>
+                            <ol>
+                                ${recipe.instructions.map(step => `
+                                    <li>
+                                        <span class="step-number"></span>
+                                        <span>${step}</span>
+                                    </li>
+                                `).join('')}
+                            </ol>
+                        </div>
+                    </div>
                 </div>
             `;
+            
+            document.getElementById('currentRecipe').innerHTML = content;
         }
 
         document.getElementById('generateButton').addEventListener('click', async () => {
             try {
+                showLoading();
                 const response = await fetch('/api/recipe');
                 const data = await response.json();
                 
                 if (data.success) {
                     const recipe = JSON.parse(data.recipe);
-                    recipes.unshift(recipe); // Add new recipe to the beginning of array
+                    recipes.unshift(recipe);
+                    recipeCount++;
+                    updateRecipeCount();
                     
-                    // Add to recipe list
                     const recipeList = document.getElementById('recipeList');
                     const recipeItem = document.createElement('div');
                     recipeItem.className = 'recipe-item';
                     recipeItem.innerHTML = `
-                        <img src="${recipe.image_url}" 
-                             alt="${recipe.name}" 
-                             class="recipe-thumbnail"
-                             onerror="handleImageError(this)">
-                        <span>${recipe.name}</span>
+                        <div class="recipe-item-image">
+                            <img src="${recipe.image_url}" 
+                                 alt="${recipe.name}" 
+                                 class="recipe-thumbnail"
+                                 onerror="handleImageError(this)">
+                        </div>
+                        <div class="recipe-item-details">
+                            <span class="recipe-item-name">${recipe.name}</span>
+                            <span class="recipe-item-category">${recipe.category}</span>
+                        </div>
                     `;
-                    recipeItem.addEventListener('click', () => displayRecipe(recipe));
+                    recipeItem.addEventListener('click', () => {
+                        document.querySelectorAll('.recipe-item').forEach(item => item.classList.remove('active'));
+                        recipeItem.classList.add('active');
+                        displayRecipe(recipe);
+                    });
                     recipeList.insertBefore(recipeItem, recipeList.firstChild);
                     
-                    // Display the new recipe
-                    displayRecipe(recipe);
+                    displayRecipe(recipe, true);
                 }
             } catch (error) {
                 console.error('Error:', error);
+            } finally {
+                hideLoading();
             }
         });
     </script>
